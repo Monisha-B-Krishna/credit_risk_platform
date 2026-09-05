@@ -24,3 +24,6 @@ seaborn>=0.13.2
 
 # --- Config / env vars ---
 python-dotenv>=1.0.1
+
+# --- Jupyter notebook support ---
+ipykernel>=6.29.0
