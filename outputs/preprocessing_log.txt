@@ -1,0 +1,8 @@
+
+--- Run at 2026-09-05T23:16:00.493648 ---
+Feature matrix shape: (307507, 97)
+Target distribution:
+TARGET
+0    91.927013
+1     8.072987
+Name: proportion, dtype: float64
