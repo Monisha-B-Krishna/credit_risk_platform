@@ -36,7 +36,7 @@ credit_risk_platform/
 │   ├── ml/
 │   │   ├── train.py        # Trains and saves the model
 │   │   ├── evaluate.py     # Checks how well the model performs
-│   │   ├── predict.py      # Scores a single applicant (in progress)
+│   │   ├── predict.py      # Scores a single applicant, returns probability + risk score/band
 │   │   └── compare_models.py  # Tests class weighting on/off
 │   ├── talk_to_data/       # NL-to-SQL chatbot (not yet built)
 │   └── utils/
@@ -185,6 +185,41 @@ than double-checking a safe applicant, `class_weight="balanced"` was
 kept as the final choice. The comparison script is in
 `src/ml/compare_models.py`.
 
+### Scoring a New Applicant
+
+`src/ml/predict.py` takes a single applicant's details (as a plain
+Python dictionary, using the same field names as
+`application_train.csv`) and returns a default probability, a risk
+score out of 100, and a risk band (Low / Medium / High).
+
+Risk bands are business-rule thresholds chosen for this project, not
+statistically derived from the validation set:
+
+| Band | Probability |
+|---|---|
+| Low | below 10% |
+| Medium | 10% - 30% |
+| High | 30% and above |
+
+A new applicant naturally won't have every one of the 97 fields the
+model was trained on (e.g. no bureau/previous application history yet
+for a first-time applicant). Any missing fields are filled the same
+way "no history" was handled during training - 0 for count-based
+fields, left blank for LightGBM to treat as missing otherwise. The
+output includes an `input_completeness` count so it's transparent how
+much of the assessment relied on provided information versus defaults.
+
+Demo run (`python src/ml/predict.py`), using an illustrative sample
+applicant:
+
+```
+Default Probability: 12.93%
+Risk Score:          12.93 / 100
+Risk Band:           MEDIUM
+Provided features:   23
+Filled with defaults: 74
+```
+
 ## 4. Explainability
 
 Not yet built. Planned: SHAP will be used to explain individual
@@ -224,3 +259,7 @@ whole app runs with a single command.
 - The bureau, previous application, and installment features assume
   that history happened before the current loan decision, which is
   reasonable for this dataset but worth stating clearly.
+- A new applicant scored through `predict.py` may have many fields
+  filled with defaults (e.g. no prior bureau/installment history yet).
+  The output reports exactly how many fields were provided versus
+  defaulted, so this is transparent rather than hidden.
