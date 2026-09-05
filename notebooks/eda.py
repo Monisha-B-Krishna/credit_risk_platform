@@ -1,34 +1,48 @@
 # %% [markdown]
-# # AI-Powered Credit Risk Intelligence Platform - Exploratory Data Analysis
+# ## AI-Powered Credit Risk Intelligence Platform - Exploratory Data Analysis
 #
-# **Dataset analysed:** `application_train.csv` (Home Credit Default Risk),
-# plus supplementary tables (`bureau.csv`, `previous_application.csv`,
-# `installments_payments.csv`) in the final section.
+# Dataset analysed: Home Credit Default Risk
 
 # %% [markdown]
 # ## 1. Introduction & Business Understanding
 #
-# **Problem Statement:** Financial institutions face the challenge of
-# identifying applicants who may fail to repay their loans. Incorrect
-# credit decisions can lead to financial losses, while overly strict
-# lending decisions may reject potentially reliable customers.
+# **Objective:** Design and build a lightweight
+# AI-powered credit risk platform using the Home Credit Default Risk dataset.
 #
-# **Objective:** I'm exploring historical loan application data to
-# identify patterns associated with loan default, understand the quality
-# and characteristics of the dataset, and generate insights that support
-# building a credit risk prediction model.
+# **Business Context:** Banks face pressure to
+# make faster, more accurate, and explainable credit decisions. This
+# platform is meant to address real banking needs:
+# - Identify high-risk loan applicants early
+# - Automate risk scoring and decision support
+# - Provide explainable reasons for risk classifications
+# - Satisfy audit and regulatory requirements
+# - Let business analysts explore data in plain English
+# - Bridge ML insights and credit policy with rules
 #
 # **Target variable:**
-# - `TARGET = 0` -> the applicant did not experience payment difficulties
-# - `TARGET = 1` -> the applicant experienced payment difficulties/default
+# - TARGET = 0 -> the applicant did not experience payment difficulties
+# - TARGET = 1 -> the applicant experienced payment difficulties/default
+
+# %% [markdown]
+# ### 1.1 Dataset Files
 #
-# The model I build later will learn from these historical applicants to
-# predict a probability of default for new applicants.
+# This isn't one file - it's 10 CSVs that join together like tables in a database.
+#
+# **Files actually used in this notebook:**
+# - application_train.csv - the main table, one row per applicant, has TARGET
+# - bureau.csv, previous_application.csv, installments_payments.csv - brought in later (Section 20) to check credit history and repayment behaviour, since that signal isn't in the main table at all
+#
+# **Not used here, but relevant later for modeling:**
+# - bureau_balance.csv, POS_CASH_balance.csv, credit_card_balance.csv - these need aggregation before they're useful (e.g. one applicant can have hundreds of monthly balance rows), so they're better handled in the feature engineering pipeline than in EDA
+# - application_test.csv has no TARGET column, so it can't be used to check model performance - a stratified split of application_train.csv is used for validation instead
+#
+# **Not used at all:**
+# - HomeCredit_columns_description.csv - just a reference for column meanings while writing this
 
 # %% [markdown]
 # ## 2. Import Libraries
 #
-# I'm importing what I need for data manipulation, numerical operations,
+# Importing what is needed for data manipulation, numerical operations,
 # visualization, and statistics.
 
 # %%
@@ -47,14 +61,13 @@ warnings.filterwarnings("ignore")
 sns.set_theme(style="whitegrid")
 pd.set_option("display.max_columns", 50)
 
-SCREENSHOT_DIR = Path("../documents/screenshots")
-SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+CHART_DIR = Path("../outputs/eda_charts")
+CHART_DIR.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown]
 # ## 3. Load the Dataset
 #
-# `application_train.csv` contains historical loan applications and the
-# `TARGET` label - this is the core table for everything in this notebook.
+# application_train.csv contains historical loan applications and the TARGET label
 
 # %%
 DATA_PATH = "../data/application_train.csv"
@@ -67,8 +80,7 @@ print("Shape:", df.shape)
 # %% [markdown]
 # ## 4. Dataset Overview
 #
-# I want to understand: number of applicants, number of features, dataset
-# structure, data types, and what a few sample rows actually look like.
+# To understand: number of applicants, number of features, dataset structure, data types, and what a few sample rows actually look like.
 
 # %%
 print("Dataset Shape:")
@@ -91,18 +103,12 @@ print("\nDetailed Dataset Information:")
 df.info(verbose=False)
 
 # %% [markdown]
-# **My takeaway:** the dataset has {shape} rows and {cols} columns, mixing
-# numerical variables (financial amounts, day-based durations) with
-# categorical variables (demographics, employment, housing). I'll fill in
-# the exact counts once I run this against the real file. This mix is why
-# I categorize features by business meaning in Section 7, rather than
-# treating all 122+ columns as one undifferentiated block.
+# The dataset contains 307,511 rows and 122 columns: 65 float64 (continuous financial/ratio values), 41 int64 (counts and flags), and 16 string/categorical columns. This mix of types is the reason features are grouped by business meaning in Section 7 rather than treated as one undifferentiated block. Memory usage is ~325 MB, small enough to work with directly in memory.
 
 # %% [markdown]
-# ## 5. Target Variable Analysis ⭐
+# ## 5. Target Variable Analysis
 #
-# Understanding: number of defaults, number of non-defaults, default
-# percentage, and class imbalance.
+# Understanding: number of defaults, number of non-defaults, default percentage, and class imbalance.
 
 # %%
 target_counts = df["TARGET"].value_counts()
@@ -134,22 +140,17 @@ for p in ax.patches:
     )
 
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "01_target_distribution.png", dpi=120)
+plt.savefig(CHART_DIR / "01_target_distribution.png", dpi=120)
 plt.show()
 
 # %% [markdown]
-# **My takeaway - Class Imbalance:** if roughly 8% of applicants default,
-# the dataset is imbalanced - default cases represent a significantly
-# smaller share than non-default cases. This means accuracy alone won't be
-# an appropriate model evaluation metric later; I'll need ROC-AUC and
-# PR-AUC, and I'll need to handle the imbalance explicitly when training
-# (e.g. class weighting) rather than training on raw class proportions.
+# Class Imbalance: at roughly 8% default rate, the dataset is imbalanced - default cases represent a significantly smaller share than non-default cases. Accuracy alone won't be an appropriate evaluation metric; ROC-AUC and PR-AUC are needed instead, along with explicit imbalance handling during training (e.g. class weighting) rather than training on raw class proportions.
 
 # %% [markdown]
-# ## 6. Data Quality Analysis ⭐
+# ## 6. Data Quality Analysis
 #
-# I'm checking missing values, duplicates, and data types here - this
-# directly decides my cleaning/imputation strategy in the next phase.
+# checking missing values, duplicates, and data types here - this
+# directly decides cleaning/imputation strategy in the next phase.
 
 # %% [markdown]
 # ### 6.1 Missing Value Analysis
@@ -170,9 +171,7 @@ missing_df.head(20)
 
 # %% [markdown]
 # ### 6.2 Categorize Missing Values
-#
-# Raw percentages are harder to reason about than buckets, so I'm grouping
-# every column into a missingness tier.
+# Each column is grouped into a missingness tier
 
 # %%
 def missing_category(value):
@@ -199,7 +198,7 @@ plt.figure(figsize=(12, 8))
 sns.barplot(data=top_missing, x="Missing Percentage", y="Column")
 plt.title("Top 20 Features with Missing Values")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "02_missing_values.png", dpi=120)
+plt.savefig(CHART_DIR / "02_missing_values.png", dpi=120)
 plt.show()
 
 # %% [markdown]
@@ -223,20 +222,15 @@ missing_summary = (
 missing_summary
 
 # %% [markdown]
-# **My takeaway:** I'm noting the duplicate row count above - if it's 0,
-# no dedup step is needed in preprocessing. For missing values, columns in
-# the "Very High Missingness" tier (mostly apartment/building detail
-# fields, e.g. `COMMONAREA_AVG`) are candidates to drop entirely rather
-# than impute, since imputing >60% of a column mostly manufactures signal
-# that isn't really there. Columns in "Low/Moderate" tiers I'll impute
-# (median for numeric, a dedicated "Unknown" category for categorical)
-# rather than drop, so I don't lose rare default cases along with them.
+# No duplicate rows were found, so no deduplication step is needed. 17 fall in the "Very High Missingness" tier (>60%) - almost entirely apartment/building detail fields (e.g. COMMONAREA_AVG at 69.87%) that were likely collected the same way three
+# times (avg/mode/medi), plus OWN_CAR_AGE (65.99%, structurally missing for non-car-owners). 32 columns fall in "High Missingness" (40-60%) and
+# will need individual review before deciding drop vs. impute. The remaining 18 columns (10 "Low" + 8 "Moderate") are reasonable to impute
+# directly - median for numeric, a dedicated "Unknown" category for categorical.
 
 # %% [markdown]
 # ## 7. Feature Understanding & Categorization
 #
-# Instead of looking at 122+ columns randomly, I'm grouping them into
-# business-meaningful categories.
+# Rather than reviewing 122+ columns in no particular order, they are grouped here into business-meaningful categories.
 
 # %%
 feature_categories = {
@@ -248,8 +242,8 @@ feature_categories = {
         "AMT_INCOME_TOTAL", "AMT_CREDIT", "AMT_ANNUITY", "AMT_GOODS_PRICE"
     ],
     "Employment": [
-        "NAME_INCOME_TYPE", "NAME_OCCUPATION_TYPE", "DAYS_EMPLOYED"
-    ],
+    "NAME_INCOME_TYPE", "OCCUPATION_TYPE", "DAYS_EMPLOYED"
+],
     "Family": [
         "CNT_FAM_MEMBERS", "NAME_FAMILY_STATUS", "CNT_CHILDREN"
     ],
@@ -276,18 +270,9 @@ for category, columns in feature_categories.items():
             print(" -", column)
 
 # %% [markdown]
-# **My takeaway:** "Credit Bureau" here refers to `AMT_REQ_CREDIT_BUREAU_*`
-# columns that already live inside `application_train.csv` - these count
-# how many times a credit bureau was checked about this applicant recently
-# (hour/day/week/month/quarter/year). This is different from the separate
-# `bureau.csv` table (the applicant's actual credit history at other
-# lenders), which I analyse separately in Section 21, since it needs a
-# join rather than living in this table directly.
-
-# %% [markdown]
-# ## 8. Data Anomaly Analysis ⭐
+# ## 8. Data Anomaly Analysis
 #
-# `DAYS_EMPLOYED` contains a known placeholder value that needs flagging
+# DAYS_EMPLOYED contains a known placeholder value that needs flagging
 # before it reaches the model as a fake numeric outlier.
 
 # %%
@@ -296,38 +281,36 @@ df["DAYS_EMPLOYED"].describe()
 # %%
 df["DAYS_EMPLOYED"].value_counts().head()
 
-# %% [markdown]
-# **My takeaway:** the employment duration variable contains an unusually
-# large value of 365243 days (~1000 years) - not a realistic employment
-# duration. This is a placeholder Home Credit used for applicants who
-# aren't currently employed (e.g. pensioners). I'll treat this as an
-# anomaly and convert it to NaN in Section 9 rather than leaving it as a
-# fake numeric value.
+# %%
+pct_anomaly = (df["DAYS_EMPLOYED"] == 365243).sum() / len(df) * 100
+print(f"{pct_anomaly:.2f}%")
+
+# %%
+df[df["DAYS_EMPLOYED"] == 365243]["NAME_INCOME_TYPE"].value_counts()
 
 # %% [markdown]
-# ## 9. Feature Engineering for EDA ⭐⭐⭐
+# ## 9. Feature Engineering for EDA
 #
-# I'm creating business-meaningful features here to make the rest of the
-# analysis more interpretable - these are candidates I'll formalize
-# properly in the Phase 3 feature engineering pipeline.
+# Creating business-meaningful features here to make the rest of the
+# analysis more interpretable - these are candidates to be formalized in a separate feature engineering pipeline
 
 # %% [markdown]
 # ### 9.1 Age
-# The dataset stores age as negative days, so I convert to positive years.
+# The dataset stores age as negative days, converted here to positive years.
 
 # %%
 df["AGE_YEARS"] = df["DAYS_BIRTH"].abs() / 365
 
 # %% [markdown]
 # ### 9.2 Employment Years
-# I replace the 365243 anomaly with NaN first, then convert to years.
+# The 365243 anomaly is replaced with NaN first, then converted to years
 
 # %%
 df["DAYS_EMPLOYED_CLEAN"] = df["DAYS_EMPLOYED"].replace(365243, np.nan)
 df["EMPLOYMENT_YEARS"] = df["DAYS_EMPLOYED_CLEAN"].abs() / 365
 
 # %% [markdown]
-# ### 9.3 Loan-to-Income Ratio ⭐
+# ### 9.3 Loan-to-Income Ratio
 # `AMT_CREDIT / AMT_INCOME_TOTAL` - how large is the requested loan
 # relative to the applicant's income. A higher ratio may indicate the
 # applicant is requesting a loan that's large relative to what they earn.
@@ -336,7 +319,7 @@ df["EMPLOYMENT_YEARS"] = df["DAYS_EMPLOYED_CLEAN"].abs() / 365
 df["LOAN_TO_INCOME_RATIO"] = df["AMT_CREDIT"] / df["AMT_INCOME_TOTAL"]
 
 # %% [markdown]
-# ### 9.4 Annuity-to-Income Ratio ⭐
+# ### 9.4 Annuity-to-Income Ratio
 # `AMT_ANNUITY / AMT_INCOME_TOTAL` - regular payment relative to income.
 # This approximates the applicant's repayment burden.
 
@@ -359,12 +342,12 @@ plt.title("Applicant Age Distribution")
 plt.xlabel("Age (Years)")
 plt.ylabel("Number of Applicants")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "03_age_distribution.png", dpi=120)
+plt.savefig(CHART_DIR / "03_age_distribution.png", dpi=120)
 plt.show()
 
 # %% [markdown]
 # ### 10.2 Income Distribution
-# Income contains extreme values, so I use a log transform just for
+# Income contains extreme values, so log transform just for
 # visualization - this doesn't change the underlying data, only how it's
 # plotted.
 
@@ -374,7 +357,7 @@ sns.histplot(np.log1p(df["AMT_INCOME_TOTAL"]), bins=50, kde=True)
 plt.title("Income Distribution (Log Scale)")
 plt.xlabel("Log(Income)")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "04_income_distribution.png", dpi=120)
+plt.savefig(CHART_DIR / "04_income_distribution.png", dpi=120)
 plt.show()
 
 # %% [markdown]
@@ -386,7 +369,7 @@ sns.histplot(np.log1p(df["AMT_CREDIT"]), bins=50, kde=True)
 plt.title("Loan Amount Distribution (Log Scale)")
 plt.xlabel("Log(Loan Amount)")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "05_loan_amount_distribution.png", dpi=120)
+plt.savefig(CHART_DIR / "05_loan_amount_distribution.png", dpi=120)
 plt.show()
 
 # %% [markdown]
@@ -398,19 +381,11 @@ sns.histplot(df["EMPLOYMENT_YEARS"].dropna(), bins=50, kde=True)
 plt.title("Employment Duration Distribution")
 plt.xlabel("Years Employed")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "06_employment_distribution.png", dpi=120)
+plt.savefig(CHART_DIR / "06_employment_distribution.png", dpi=120)
 plt.show()
 
 # %% [markdown]
-# **My takeaway:** I'm looking at each distribution's shape here - income
-# and loan amount are both right-skewed (most applicants cluster at lower
-# values with a long tail of high earners/large loans), which is why I
-# log-transformed them just to make the histogram readable. Age looks
-# fairly evenly spread across working adults. I'll note the actual skew
-# and any surprising spikes once I run this against the real file.
-
-# %% [markdown]
-# ## 11. Outlier Analysis ⭐
+# ## 11. Outlier Analysis
 #
 # Visualizing income, loan amount, and annuity for extreme values.
 
@@ -419,15 +394,19 @@ plt.figure(figsize=(10, 5))
 sns.boxplot(x=df["AMT_INCOME_TOTAL"])
 plt.title("Income Outlier Analysis")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "07_income_outliers.png", dpi=120)
+plt.savefig(CHART_DIR / "07_income_outliers.png", dpi=120)
 plt.show()
+
+# %%
+print(df["AMT_INCOME_TOTAL"].max())
+df[df["AMT_INCOME_TOTAL"] > 50000000][["SK_ID_CURR", "AMT_INCOME_TOTAL", "NAME_INCOME_TYPE", "TARGET"]]
 
 # %%
 plt.figure(figsize=(10, 5))
 sns.boxplot(x=df["AMT_CREDIT"])
 plt.title("Loan Amount Outlier Analysis")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "08_loan_outliers.png", dpi=120)
+plt.savefig(CHART_DIR / "08_loan_outliers.png", dpi=120)
 plt.show()
 
 # %%
@@ -435,15 +414,8 @@ plt.figure(figsize=(10, 5))
 sns.boxplot(x=df["AMT_ANNUITY"])
 plt.title("Annuity Outlier Analysis")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "09_annuity_outliers.png", dpi=120)
+plt.savefig(CHART_DIR / "09_annuity_outliers.png", dpi=120)
 plt.show()
-
-# %% [markdown]
-# **My takeaway:** I expect a handful of very high-income/high-loan
-# outliers given how skewed these distributions are. I won't necessarily
-# remove these rows - a genuinely wealthy applicant isn't a data error -
-# but I'll cap or log-transform these features during modeling so a small
-# number of extreme values don't dominate the model's learned splits.
 
 # %% [markdown]
 # ## 12. Categorical Feature Distribution
@@ -457,7 +429,7 @@ sns.countplot(data=df, x="NAME_INCOME_TYPE")
 plt.xticks(rotation=30)
 plt.title("Distribution of Applicant Income Types")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "10_income_type_distribution.png", dpi=120)
+plt.savefig(CHART_DIR / "10_income_type_distribution.png", dpi=120)
 plt.show()
 
 # %%
@@ -475,18 +447,14 @@ sns.countplot(data=df, x="CODE_GENDER", ax=axes[2])
 axes[2].set_title("Gender")
 
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "11_categorical_distributions.png", dpi=120)
+plt.savefig(CHART_DIR / "11_categorical_distributions.png", dpi=120)
 plt.show()
 
-# %% [markdown]
-# **My takeaway:** this tells me the shape of the applicant population
-# itself, which matters for interpreting Section 13 correctly - if one
-# category has very few applicants, its default rate can swing wildly on
-# small counts and shouldn't be over-trusted the same way a large category
-# would be.
+# %%
+df["CODE_GENDER"].value_counts()
 
 # %% [markdown]
-# ## 13. Bivariate Risk Analysis ⭐⭐⭐
+# ## 13. Bivariate Risk Analysis
 #
 # The most important section - comparing features against `TARGET` to see
 # which ones actually relate to default.
@@ -508,7 +476,7 @@ age_default.plot(kind="bar", figsize=(10, 6), color="#6A4C93")
 plt.title("Default Rate by Age Group")
 plt.ylabel("Default Rate (%)")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "12_default_by_age.png", dpi=120)
+plt.savefig(CHART_DIR / "12_default_by_age.png", dpi=120)
 plt.show()
 
 # %% [markdown]
@@ -525,7 +493,7 @@ plt.title("Default Rate by Income Group")
 plt.ylabel("Default Rate (%)")
 plt.xticks(rotation=30, ha="right")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "13_default_by_income.png", dpi=120)
+plt.savefig(CHART_DIR / "13_default_by_income.png", dpi=120)
 plt.show()
 
 # %% [markdown]
@@ -542,7 +510,7 @@ plt.title("Default Rate by Loan Amount Group")
 plt.ylabel("Default Rate (%)")
 plt.xticks(rotation=30, ha="right")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "14_default_by_loan_amount.png", dpi=120)
+plt.savefig(CHART_DIR / "14_default_by_loan_amount.png", dpi=120)
 plt.show()
 
 # %% [markdown]
@@ -579,7 +547,7 @@ plt.title("Default Rate by Employment Duration")
 plt.ylabel("Default Rate (%)")
 plt.xticks(rotation=30, ha="right")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "15_default_by_employment.png", dpi=120)
+plt.savefig(CHART_DIR / "15_default_by_employment.png", dpi=120)
 plt.show()
 
 # %% [markdown]
@@ -597,17 +565,7 @@ family_default = df.groupby("NAME_FAMILY_STATUS")["TARGET"].mean().sort_values(a
 print(family_default)
 
 # %% [markdown]
-# **My takeaway:** I'll fill in the specific highest/lowest-risk group for
-# each of the above once I run this against the real data (see Section
-# 18). Structurally, this section is exactly the evidence base for which
-# features go into the model and which decision rules become defensible
-# business logic later in Phase 5.
-
-# %% [markdown]
-# ## 14. Financial Risk Analysis ⭐⭐⭐
-#
-# Directly relevant to this project - checking whether the two engineered
-# ratios from Section 9 actually relate to default.
+# ## 14. Financial Risk Analysis
 
 # %% [markdown]
 # ### Default Rate by Loan-to-Income Ratio
@@ -624,7 +582,7 @@ plt.title("Default Rate by Loan-to-Income Ratio")
 plt.ylabel("Default Rate (%)")
 plt.xticks(rotation=30, ha="right")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "16_default_by_loan_to_income.png", dpi=120)
+plt.savefig(CHART_DIR / "16_default_by_loan_to_income.png", dpi=120)
 plt.show()
 
 # %% [markdown]
@@ -644,15 +602,8 @@ plt.title("Default Rate by Annuity-to-Income Ratio")
 plt.ylabel("Default Rate (%)")
 plt.xticks(rotation=30, ha="right")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "17_default_by_annuity_to_income.png", dpi=120)
+plt.savefig(CHART_DIR / "17_default_by_annuity_to_income.png", dpi=120)
 plt.show()
-
-# %% [markdown]
-# **My takeaway:** I'm using these two engineered ratios rather than the
-# raw amounts because a raw loan amount alone doesn't tell you whether
-# that's "a lot" for that applicant - the ratio does. If the pattern holds
-# (higher ratio -> higher default rate), both become strong candidate
-# features and strong candidates for the business rule engine in Phase 5.
 
 # %% [markdown]
 # ## 15. Asset Analysis
@@ -672,15 +623,7 @@ property_default = df.groupby("FLAG_OWN_REALTY")["TARGET"].mean() * 100
 print(property_default)
 
 # %% [markdown]
-# **My takeaway:** owning assets (car/property) often acts as a proxy for
-# financial stability. I'll note whether owners default less often once I
-# run this - if the gap is small, I won't overweight these as features
-# despite the intuitive story.
-
-# %% [markdown]
-# ## 16. Correlation Analysis ⭐
-#
-# Only numeric features can go into a Pearson correlation directly.
+# ## 16. Correlation Analysis
 
 # %%
 numeric_df = df.select_dtypes(include=["int64", "float64"])
@@ -699,113 +642,62 @@ sns.barplot(x=top_features.values, y=top_features.index)
 plt.title("Features Most Correlated with Default")
 plt.xlabel("Correlation with TARGET")
 plt.tight_layout()
-plt.savefig(SCREENSHOT_DIR / "18_correlation_analysis.png", dpi=120)
+plt.savefig(CHART_DIR / "18_correlation_analysis.png", dpi=120)
 plt.show()
 
 # %% [markdown]
-# ⚠️ **Important documentation note:** I'm not writing "correlation proves
-# this feature causes default." Correlation indicates an association
-# between variables but does not establish causation. I'll phrase my
-# findings in Section 18 accordingly.
-
-# %% [markdown]
-# ## 17. Feature Availability Analysis ⭐⭐⭐
-#
-# I want to be explicit about *when* each piece of information is actually
-# available, so the model only ever uses data that would genuinely exist
-# at the moment a real credit decision gets made.
+# ## 17. Feature Availability Analysis
 #
 # **Available at loan application time:** age, income, employment,
 # education, requested loan amount, housing, assets.
 #
 # **Available from credit history:** credit bureau information, previous
 # applications, installment history, credit card history.
-#
-# **Why this matters:** using information that wouldn't actually have
-# existed at approval time would make the model look better than it really
-# is during testing, but fail in production. I'll keep this distinction in
-# mind explicitly during Phase 3 feature engineering.
 
 # %% [markdown]
-# ## 18. EDA Key Findings ⭐⭐⭐
+# ## 18. EDA Key Findings
 #
-# **I'm filling these in only after running the notebook against the real
-# data - not before.** The blanks below get replaced with the actual
-# numbers from the cells above once I run this end to end.
+# 1. Default rate is 8.07% overall - imbalanced enough that accuracy is a useless metric here (predicting "no default" every time scores ~92%
+# while catching nothing). ROC-AUC/PR-AUC needed instead.
 #
-# **Finding 1 - Class Imbalance:** Approximately ___% of applicants
-# experienced payment difficulties, while ___% did not. This confirms
-# significant class imbalance and requires appropriate model evaluation
-# techniques (ROC-AUC, PR-AUC) during the ML stage rather than accuracy.
+# 2. Missing data: 55 of 122 columns are complete. The 17 columns above 60% missing are mostly redundant building-detail fields (avg/mode/medi
+# versions of the same thing) - dropping those. OWN_CAR_AGE's 66% missing is structural (non-car-owners), so that gets imputed as 0, not median.
+# No duplicate rows.
 #
-# **Finding 2 - Missing Values:** ___ columns show high (>40%) missingness,
-# mostly in the ___ category. These require a defined strategy (drop vs.
-# impute) before model training - see Section 6.
+# 3. Age is the cleanest signal in the dataset - default rate drops from 12.3% (under 25) to 3.7% (65+), almost linearly. Employment duration
+# tells a similar story: 11% in the first 3 years, down to 4.2% at 20+ years.
 #
-# **Finding 3 - Duplicate Rows:** ___ duplicate rows were found.
+# 4. Income is flat (~8.1-8.7%) except at the very top - only the 225K+ quintile drops meaningfully, to 6.5%. The engineered ratios
+# split differently too: annuity-to-income rises fairly consistently (7.2% -> 8.7%), but loan-to-income is non-monotonic - it peaks mid-range
+# at 8.9% and actually falls back to 7.3% at the highest band, so it's not a simple "bigger loan = riskier" story.
 #
-# **Finding 4 - Age Risk Pattern:** The ___ age group showed the highest
-# observed default rate of ___%.
+# 5. Two data quality issues: DAYS_EMPLOYED's 365243 value (18% of rows) is Home Credit's placeholder for "not employed" - 99.96%
+# of those rows are Pensioners. And one applicant (SK_ID_CURR 114967) reports 117 million in income while "Working" - an entry error.
+# CODE_GENDER also has 4 rows with "XNA" instead of M/F - negligible, will just drop those rows.
 #
-# **Finding 5 - Income Pattern:** Applicants in the ___ income group
-# showed the highest observed default rate of ___%.
-#
-# **Finding 6 - Financial Burden:** Applicants with a loan-to-income ratio
-# in the ___ band showed a default rate of ___%, compared to ___% for the
-# lowest band.
-#
-# **Finding 7 - Employment:** Default rates varied across employment
-# duration groups - the ___ group showed the highest rate at ___%,
-# suggesting employment characteristics carry real predictive signal.
-#
-# **Finding 8 - Data Anomaly:** `DAYS_EMPLOYED` contains an anomalous
-# value of 365243 days, affecting ___ rows (___%). This requires
-# preprocessing before machine learning (see Section 8).
+# Strongest overall predictors: EXT_SOURCE_1/2/3, followed by age and employment duration. Income and loan-to-income ratio matter less than expected on their own.
 
 # %% [markdown]
-# ## 19. Business Implications ⭐⭐⭐
+# ## 19. Business Implications
 #
-# Connecting the EDA back to the actual banking problem NeoStats described.
+# **Financial Risk:** annuity-to-income ratio is a solid repayment-burden
+# indicator and worth a business rule. Loan-to-income ratio is less
+# reliable on its own (non-monotonic) - better left to the model than
+# turned into a simple rule.
 #
-# **Financial Risk:** loan-to-income and annuity-to-income ratios can
-# provide useful indicators of repayment burden and should be surfaced as
-# both model features and business rules.
+# **Customer Segmentation:** age and employment duration are the strongest,
+# cleanest segments for explaining risk to a non-technical reviewer - both
+# show steady, near-linear default patterns. Income is a weaker segment
+# except at the very top end.
 #
-# **Customer Segmentation:** age, employment characteristics, and income
-# category can be used to understand differences in observed default
-# behaviour across customer segments - useful for the business rule engine
-# and for explaining individual predictions to a non-technical reviewer.
-#
-# **Data Quality:** missing values and the `DAYS_EMPLOYED` anomaly need to
-# be addressed in preprocessing before the model is trained, or they will
-# quietly distort what the model learns.
+# **Data Quality:** the DAYS_EMPLOYED anomaly, heavily-missing building
+# columns, and the single income outlier all need handling in
+# preprocessing, or they'll quietly distort what the model learns.
 
 # %% [markdown]
-# ## 20. Next Steps
+# ## 20. Credit History & Repayment Behaviour
 #
-# 1. Data cleaning
-# 2. Missing value treatment
-# 3. Outlier handling
-# 4. Categorical encoding
-# 5. Feature engineering (including features from bureau/previous
-#    application/installments tables - see Section 21 below)
-# 6. Train/test/validation split
-# 7. Baseline machine learning model
-# 8. Model evaluation (ROC-AUC, PR-AUC)
-# 9. Model explainability (SHAP)
-# 10. Talk-to-data chatbot + business rule derivation
-
-# %% [markdown]
-# ## 21. Bonus: Supplementary Table Analysis (Credit History & Repayment Behaviour)
-#
-# Everything above uses only `application_train.csv`. But the assignment
-# specifically asks me to analyse "credit history" and "repayment
-# behaviour" - and the real signal for both lives in three *other* tables
-# that only connect to `application_train` through a join, not as columns
-# already sitting in this file. I'm covering them here so this notebook
-# genuinely covers all five areas NeoStats listed (demographics, financial,
-# credit history, repayment behaviour, data quality), not just the four
-# that live inside the main table alone.
+# Analysis so far has used application_train.csv alone. Credit history and repayment behaviour - both explicitly required - live in three tables that connect to application_train via a join: bureau.csv (credit history at other lenders), previous_application.csv (past applications with Home Credit), and installments_payments.csv (actual repayment history).
 
 # %%
 import sys
@@ -815,7 +707,7 @@ from src.data.loader import load_all_tables
 tables = load_all_tables(data_dir="../data")
 
 # %% [markdown]
-# ### 21.1 Credit History - bureau.csv
+# ### 20.1 Credit History - bureau.csv
 # The applicant's credit history at *other* lenders, not just Home Credit.
 
 # %%
@@ -838,7 +730,7 @@ else:
     print("bureau.csv not found in data/ - skipping.")
 
 # %% [markdown]
-# ### 21.2 Previous Applications - previous_application.csv
+# ### 20.2 Previous Applications - previous_application.csv
 # The applicant's past loan applications with Home Credit itself.
 
 # %%
@@ -860,13 +752,13 @@ if prev is not None:
     plt.title("Default Rate by Prior Refusal History")
     plt.ylabel("Default Rate (%)")
     plt.tight_layout()
-    plt.savefig(SCREENSHOT_DIR / "19_default_by_prior_refusal.png", dpi=120)
+    plt.savefig(CHART_DIR / "19_default_by_prior_refusal.png", dpi=120)
     plt.show()
 else:
     print("previous_application.csv not found in data/ - skipping.")
 
 # %% [markdown]
-# ### 21.3 Repayment Behaviour - installments_payments.csv
+# ### 20.3 Repayment Behaviour - installments_payments.csv
 # Compares what applicants were supposed to pay vs. what they actually
 # paid and when - the most direct historical repayment-discipline signal
 # in the whole dataset.
@@ -892,15 +784,13 @@ if installments is not None:
     plt.ylabel("Default Rate (%)")
     plt.xticks(rotation=20, ha="right")
     plt.tight_layout()
-    plt.savefig(SCREENSHOT_DIR / "20_default_by_payment_lateness.png", dpi=120)
+    plt.savefig(CHART_DIR / "20_default_by_payment_lateness.png", dpi=120)
     plt.show()
 else:
     print("installments_payments.csv not found in data/ - skipping.")
 
+# %%
+df_late["LATE_BAND"].value_counts()
+
 # %% [markdown]
-# **My takeaway (Section 21):** I expect both prior refusals and historical
-# payment lateness to show a clear, meaningful gap in default rate. If
-# they do, this is my strongest justification for the multi-table feature
-# engineering work in Phase 3 - it shows these supplementary tables carry
-# real signal application_train.csv alone doesn't have, not just extra
-# complexity for its own sake.
+# Applicants with no external bureau history default more often (10.12%) than those with some history (7.73%) - this reflects the "thin file" problem in credit risk: no track record is itself a risk signal, not a safety signal. Prior refusal history behaves as expected - refused applicants default more (10.32% vs 6.98%). Payment lateness rises up to the 6-15 day band (13.93%), but the "15+ days late" band's lower rate (10.02%) is based on only 1,736 applicants (0.6% of the dataset) - too small a sample to treat as reliable. The clearer, better-supported result is that any history of lateness (1-5 or 6-15 days) meaningfully raises default rate compared to never being late.
