@@ -178,7 +178,7 @@ def engineer_installment_features(installments: pd.DataFrame) -> pd.DataFrame:
     return agg
 
 
-def build_feature_matrix(tables: dict) -> tuple[pd.DataFrame, pd.Series]:
+def build_feature_matrix(tables: dict, source_key: str = "app_train"):
     """Build the full model-ready feature matrix from all loaded tables.
 
     Class imbalance is intentionally NOT handled here - that is a model
@@ -188,16 +188,23 @@ def build_feature_matrix(tables: dict) -> tuple[pd.DataFrame, pd.Series]:
     Parameters
     ----------
     tables : dict
-        Output of src.data.loader.load_all_tables().
+        Output of src.data.loader.load_all_tables(), or a dict
+        containing at least a single-applicant DataFrame under
+        source_key for prediction use.
+    source_key : str
+        Which table in `tables` to use as the base applicant data.
+        "app_train" for training (has TARGET). "app_test" or a
+        single-applicant table for prediction (no TARGET).
 
     Returns
     -------
     X : pd.DataFrame
         Feature matrix, one row per applicant.
-    y : pd.Series
-        TARGET label (1 = defaulted, 0 = repaid).
+    y : pd.Series or None
+        TARGET label if present in the source table, otherwise None
+        (prediction mode - the outcome isn't known yet).
     """
-    df = clean_application_data(tables["app_train"])
+    df = clean_application_data(tables[source_key])
     df = engineer_application_features(df)
 
     if "bureau" in tables:
@@ -231,8 +238,10 @@ def build_feature_matrix(tables: dict) -> tuple[pd.DataFrame, pd.Series]:
     # there is no track record at all. LightGBM handles NaN natively
     # during split selection, so no imputation is needed here.
 
-    y = df["TARGET"]
-    X = df.drop(columns=["TARGET", "SK_ID_CURR"])
+    has_target = "TARGET" in df.columns
+    y = df["TARGET"] if has_target else None
+    drop_cols = ["SK_ID_CURR"] + (["TARGET"] if has_target else [])
+    X = df.drop(columns=drop_cols)
 
     # LightGBM reads pandas "category" dtype natively - no manual
     # one-hot or label encoding needed.
