@@ -240,7 +240,10 @@ def build_feature_matrix(tables: dict, source_key: str = "app_train"):
 
     has_target = "TARGET" in df.columns
     y = df["TARGET"] if has_target else None
-    drop_cols = ["SK_ID_CURR"] + (["TARGET"] if has_target else [])
+
+    # Only drop columns that actually exist - a single new applicant
+    # (used for prediction) may not have an SK_ID_CURR at all.
+    drop_cols = [col for col in ["SK_ID_CURR", "TARGET"] if col in df.columns]
     X = df.drop(columns=drop_cols)
 
     # LightGBM reads pandas "category" dtype natively - no manual

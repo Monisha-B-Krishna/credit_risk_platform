@@ -8,7 +8,8 @@ Pipeline:
     3. Train LightGBM with class_weight="balanced" to address the ~8%
        default rate found during EDA, using early stopping on the
        validation set
-    4. Save the trained model and the feature column list to models/
+    4. Save the trained model, feature column list, and categorical
+       category values to models/
 
 Run from the project root: `python src/ml/train.py`
 """
@@ -99,6 +100,21 @@ def save_model(model, feature_columns):
     print(f"Feature list saved to {features_path}")
 
 
+def save_categorical_categories(X):
+    """Save the exact category values LightGBM saw during training for
+    every categorical column, so predict.py can apply the identical
+    encoding to a new applicant instead of recomputing categories from
+    a single row (which would only ever see one category and could
+    silently produce wrong predictions)."""
+    categorical_cols = X.select_dtypes(include="category").columns
+    categories = {col: X[col].cat.categories.tolist() for col in categorical_cols}
+
+    path = os.path.join(MODEL_DIR, "categorical_categories.json")
+    with open(path, "w") as f:
+        json.dump(categories, f, indent=2)
+    print(f"Categorical categories saved to {path}")
+
+
 def log_training_run(model, X_train, X_val, val_auc):
     """Append a timestamped record of this training run for comparison
     across future runs (same pattern used in preprocessor.py)."""
@@ -132,6 +148,7 @@ def main():
     print(f"Best iteration: {model.best_iteration_}")
 
     save_model(model, X.columns)
+    save_categorical_categories(X)
     log_training_run(model, X_train, X_val, val_auc)
 
 
