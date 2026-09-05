@@ -1,0 +1,6 @@
+
+--- Run at 2026-09-05T23:46:48.705058 ---
+Train rows: 246005, Val rows: 61502
+Features: 97
+Best iteration: 400
+Validation ROC-AUC: 0.7657
