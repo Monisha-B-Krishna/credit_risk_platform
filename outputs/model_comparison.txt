@@ -1,0 +1,8 @@
+Class Weighting Comparison
+=================================================================
+Metric                 No Weighting    class_weight=balanced
+ROC-AUC                      0.7656                   0.7657
+PR-AUC                       0.2578                   0.2562
+Precision                    0.5749                   0.1804
+Recall                       0.0286                   0.6483
+F1 Score                     0.0545                   0.2822
