@@ -310,13 +310,45 @@ correlated features found back in exploratory analysis.
 
 ## 7. User Interface
 
-Not yet built. Planned: a Streamlit app with tabs for EDA charts, risk
-prediction, explanations, business rules, and the chatbot.
+`app.py` (Streamlit) brings every module together into one app, four tabs:
+
+- **EDA** - charts from `outputs/eda_charts/`
+- **Assess Risk** - a form collecting applicant details (external credit
+  scores are optional), showing the risk score, band, and SHAP
+  explanation together in one flow
+- **Business Rules** - the simplified decision tree, with the real
+  model's agreement percentage shown as a metric
+- **Chat** - the talk-to-data chatbot, with clickable example questions
+  and a running conversation history
+
+Includes basic input validation (loan amount/income must be positive,
+warns if annuity exceeds income), a Responsible AI disclaimer shown
+with every prediction, and a custom theme (`.streamlit/config.toml`).
+
+Run with `streamlit run app.py`, or via Docker (see below).
 
 ## 8. Docker Deployment
 
-Not yet built. Planned: a Dockerfile and docker-compose.yml so the
-whole app runs with a single command.
+```bash
+docker compose up --build
+```
+
+Then open `http://localhost:8501`.
+
+**What's included in the image:** all code and the trained model
+artifacts (`models/credit_risk_model.joblib` and its metadata) - these
+are committed to the repo (unlike the raw dataset) so the EDA,
+Assess Risk, and Business Rules tabs work immediately with no setup.
+
+**What's mounted at runtime, not baked into the image:**
+- `data/` - the raw CSVs, required only for the Chat tab (DuckDB reads
+  them directly). Not committed to git per the assignment's instructions.
+
+**Environment variables:** copy `.env.example` to `.env` and add a free
+Groq API key (https://console.groq.com/keys) for the Chat tab to work.
+
+Verified working end-to-end: all four tabs tested successfully running
+inside the container.
 
 ## Known Limitations
 
