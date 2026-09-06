@@ -251,8 +251,41 @@ Factors decreasing risk:
 
 ## 5. Talk-to-Data Chatbot
 
-Not yet built. Planned: a chatbot that converts plain-English questions
-into SQL queries against the dataset, using Groq's free LLM API.
+Three files, matching the required structure:
+- `src/talk_to_data/query_runner.py` - loads 4 tables (applications,
+  bureau, previous_applications, installments) into DuckDB, validates
+  and executes SQL safely
+- `src/talk_to_data/prompt_templates.py` - the schema-grounded system
+  prompt (versioned as V1), including column meanings and join keys
+- `src/talk_to_data/nl_to_sql.py` - question -> SQL -> answer, using
+  Groq's free API (`openai/gpt-oss-120b`)
+
+**SQL safety validation:** only SELECT (or WITH...SELECT) statements
+are allowed; any query containing a destructive keyword (DROP, DELETE,
+UPDATE, INSERT, ALTER, etc.) is rejected before it reaches the
+database; statement-stacking (multiple queries separated by `;`) is
+blocked; results are capped at 20 rows.
+
+**Token optimization:** the schema shown to the LLM is limited to
+~20 relevant columns per table (not all 122 raw application columns),
+and both the DuckDB connection and schema summary are cached rather
+than rebuilt on every question.
+
+**5 example queries tested and working:**
+1. Average income of applicants who defaulted vs. didn't
+2. Applicants with more than 2 previously refused applications
+3. Default rate for self-employed applicants
+4. Percentage of applicants above age 50
+5. Average credit amount by education level
+
+Query 3 demonstrates a hallucination-control property worth noting
+directly: "self-employed" isn't an actual category in this dataset.
+Rather than inventing a plausible-sounding but fake percentage, the
+system honestly reported that no matching applicants were found.
+
+Run `python src/talk_to_data/nl_to_sql.py` for an interactive prompt to
+ask your own questions, or `python src/talk_to_data/nl_to_sql.py --demo`
+to re-run the 5 example queries above.
 
 ## 6. Business Rules
 
