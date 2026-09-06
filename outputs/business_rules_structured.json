@@ -1,0 +1,191 @@
+{
+  "rules": [
+    {
+      "conditions": [
+        [
+          "EXT_SOURCE_3",
+          "<=",
+          0.43561987578868866
+        ],
+        [
+          "EXT_SOURCE_2",
+          "<=",
+          0.4884878993034363
+        ],
+        [
+          "EXT_SOURCE_3",
+          "<=",
+          0.32568322122097015
+        ]
+      ],
+      "predicted_class": 1,
+      "confidence": 0.0,
+      "sample_count": 16159
+    },
+    {
+      "conditions": [
+        [
+          "EXT_SOURCE_3",
+          "<=",
+          0.43561987578868866
+        ],
+        [
+          "EXT_SOURCE_2",
+          "<=",
+          0.4884878993034363
+        ],
+        [
+          "EXT_SOURCE_3",
+          ">",
+          0.32568322122097015
+        ]
+      ],
+      "predicted_class": 1,
+      "confidence": 0.0,
+      "sample_count": 30338
+    },
+    {
+      "conditions": [
+        [
+          "EXT_SOURCE_3",
+          "<=",
+          0.43561987578868866
+        ],
+        [
+          "EXT_SOURCE_2",
+          ">",
+          0.4884878993034363
+        ],
+        [
+          "EXT_SOURCE_3",
+          "<=",
+          0.26999659836292267
+        ]
+      ],
+      "predicted_class": 1,
+      "confidence": 0.0,
+      "sample_count": 15402
+    },
+    {
+      "conditions": [
+        [
+          "EXT_SOURCE_3",
+          "<=",
+          0.43561987578868866
+        ],
+        [
+          "EXT_SOURCE_2",
+          ">",
+          0.4884878993034363
+        ],
+        [
+          "EXT_SOURCE_3",
+          ">",
+          0.26999659836292267
+        ]
+      ],
+      "predicted_class": 0,
+      "confidence": 0.0,
+      "sample_count": 53909
+    },
+    {
+      "conditions": [
+        [
+          "EXT_SOURCE_3",
+          ">",
+          0.43561987578868866
+        ],
+        [
+          "EXT_SOURCE_2",
+          "<=",
+          0.3984642028808594
+        ],
+        [
+          "EMPLOYMENT_YEARS",
+          "<=",
+          8.247945308685303
+        ]
+      ],
+      "predicted_class": 0,
+      "confidence": 0.0,
+      "sample_count": 16104
+    },
+    {
+      "conditions": [
+        [
+          "EXT_SOURCE_3",
+          ">",
+          0.43561987578868866
+        ],
+        [
+          "EXT_SOURCE_2",
+          "<=",
+          0.3984642028808594
+        ],
+        [
+          "EMPLOYMENT_YEARS",
+          ">",
+          8.247945308685303
+        ]
+      ],
+      "predicted_class": 0,
+      "confidence": 0.0,
+      "sample_count": 13353
+    },
+    {
+      "conditions": [
+        [
+          "EXT_SOURCE_3",
+          ">",
+          0.43561987578868866
+        ],
+        [
+          "EXT_SOURCE_2",
+          ">",
+          0.3984642028808594
+        ],
+        [
+          "EXT_SOURCE_2",
+          "<=",
+          0.5536030232906342
+        ]
+      ],
+      "predicted_class": 0,
+      "confidence": 0.0,
+      "sample_count": 27695
+    },
+    {
+      "conditions": [
+        [
+          "EXT_SOURCE_3",
+          ">",
+          0.43561987578868866
+        ],
+        [
+          "EXT_SOURCE_2",
+          ">",
+          0.3984642028808594
+        ],
+        [
+          "EXT_SOURCE_2",
+          ">",
+          0.5536030232906342
+        ]
+      ],
+      "predicted_class": 0,
+      "confidence": 0.0,
+      "sample_count": 73045
+    }
+  ],
+  "sentences": [
+    "IF External credit score 3 is at most 0.44 AND External credit score 2 is at most 0.49 AND External credit score 3 is at most 0.33 \u2192 HIGH RISK",
+    "IF External credit score 3 is at most 0.44 AND External credit score 2 is at most 0.49 AND External credit score 3 is above 0.33 \u2192 HIGH RISK",
+    "IF External credit score 3 is at most 0.44 AND External credit score 2 is above 0.49 AND External credit score 3 is at most 0.27 \u2192 HIGH RISK",
+    "IF External credit score 3 is at most 0.44 AND External credit score 2 is above 0.49 AND External credit score 3 is above 0.27 \u2192 LOW RISK",
+    "IF External credit score 3 is above 0.44 AND External credit score 2 is at most 0.40 AND Employment duration (years) is at most 8.25 \u2192 LOW RISK",
+    "IF External credit score 3 is above 0.44 AND External credit score 2 is at most 0.40 AND Employment duration (years) is above 8.25 \u2192 LOW RISK",
+    "IF External credit score 3 is above 0.44 AND External credit score 2 is above 0.40 AND External credit score 2 is at most 0.55 \u2192 LOW RISK",
+    "IF External credit score 3 is above 0.44 AND External credit score 2 is above 0.40 AND External credit score 2 is above 0.55 \u2192 LOW RISK"
+  ],
+  "agreement": 0.8162
+}

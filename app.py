@@ -37,32 +37,10 @@ if "last_applicant" not in st.session_state:
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-with st.sidebar:
-    st.title("Credit Risk Platform")
-    st.caption("Home Credit Default Risk")
-    st.divider()
-    st.markdown(
-        "**What this does**\n\n"
-        "- Explores the dataset (EDA)\n"
-        "- Scores a new applicant's default risk\n"
-        "- Explains individual predictions (SHAP)\n"
-        "- Shows simplified business rules\n"
-        "- Answers questions about the data\n"
-    )
-    st.divider()
-    st.subheader("Technology")
-    st.markdown(
-        "- LightGBM\n"
-        "- SHAP\n"
-        "- DuckDB\n"
-        "- Groq LLM\n"
-        "- Streamlit\n"
-    )
-    st.divider()
-    st.caption("Model: ROC-AUC 0.766, PR-AUC 0.256.")
+
 
 st.title("AI-Powered Credit Risk Intelligence Platform")
-st.caption("Prediction, explainability, business rules, and a natural-language data chatbot")
+st.caption("LightGBM model \u2022 ROC-AUC 0.766 \u2022 SHAP explainability \u2022 Groq-powered chatbot")
 
 tab_eda, tab_assess, tab_rules, tab_chat = st.tabs(
     ["EDA", "Assess Risk", "Business Rules", "Chat"]
@@ -71,6 +49,7 @@ tab_eda, tab_assess, tab_rules, tab_chat = st.tabs(
 # --- Tab 1: EDA ---
 with tab_eda:
     st.header("Exploratory Data Analysis")
+    st.caption("Built for: credit risk analysts and reviewers assessing data quality and model foundations")
     st.write("Charts generated during exploratory analysis (see `notebooks/eda.ipynb` for the full write-up).")
 
     chart_dir = os.path.join(PROJECT_ROOT, "outputs", "eda_charts")
@@ -89,6 +68,7 @@ with tab_eda:
 # --- Tab 2: Assess Risk (Predict + Explain combined) ---
 with tab_assess:
     st.header("Assess Applicant Credit Risk")
+    st.caption("Built for: loan officers evaluating a new applicant")
     st.write(
         "External credit scores are optional - leave them blank if unknown. "
         "Other fields use the values shown below."
@@ -199,11 +179,24 @@ with tab_assess:
                 st.session_state.last_applicant = applicant_data
                 st.divider()
 
-                band_color = {"Low": "green", "Medium": "orange", "High": "red"}[result["risk_band"]]
-                m1, m2, m3 = st.columns(3)
-                m1.metric("Default Probability", f"{result['probability'] * 100:.2f}%")
-                m2.metric("Risk Score", f"{result['risk_score']} / 100")
-                m3.markdown(f"### Risk Band: :{band_color}[{result['risk_band'].upper()}]")
+                band_colors = {
+                    "Low": ("#E8F5E0", "#4A9130"),
+                    "Medium": ("#FFF6E5", "#B8860B"),
+                    "High": ("#FCE8E6", "#C0392B"),
+                }
+                bg, accent = band_colors[result["risk_band"]]
+                st.markdown(
+                    f"""<div style="background-color:{bg};border:2px solid {accent};
+                    border-radius:10px;padding:20px;text-align:center;margin-bottom:15px;">
+                    <div style="font-size:14px;color:#555;">RISK ASSESSMENT</div>
+                    <div style="font-size:38px;font-weight:bold;color:{accent};margin:6px 0;">
+                    {result['risk_band'].upper()}</div>
+                    <div style="font-size:16px;color:#333;">
+                    {result['risk_score']} / 100 risk score
+                    ({result['probability']*100:.2f}% default probability)</div>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
 
                 completeness = result["input_completeness"]
                 st.caption(
@@ -244,7 +237,7 @@ with tab_assess:
                                 item["feature"],
                                 str(item["value"]),
                                 delta=f"-{abs(item['impact']):.3f} model impact",
-                                delta_color="normal",
+                                delta_color="inverse",
                             )
                     else:
                         st.write("None identified.")
@@ -258,30 +251,75 @@ with tab_assess:
 # --- Tab 3: Business Rules ---
 with tab_rules:
     st.header("Simplified Business Rules")
+    st.caption("Built for: credit risk analysts reviewing model logic")
     st.write(
         "A shallow decision tree trained to approximate the real model's "
-        "predictions - simple enough for a non-technical credit policy team "
-        "to review and understand. It is not a replacement for the actual "
-        "model used for scoring."
+        "predictions - simple enough to review without a data science "
+        "background. It is not a replacement for the actual model used "
+        "for scoring."
     )
-    st.info("Rule interpretation: class 0 = lower predicted default risk, class 1 = higher predicted default risk.")
 
-    rules_path = os.path.join(PROJECT_ROOT, "outputs", "business_rules.txt")
-    if os.path.exists(rules_path):
-        with open(rules_path) as f:
-            rules_text = f.read()
+    structured_path = os.path.join(PROJECT_ROOT, "outputs", "business_rules_structured.json")
+    if os.path.exists(structured_path):
+        import json
+        with open(structured_path) as f:
+            rules_data = json.load(f)
 
-        agreement_match = re.search(r"Agreement with the real model.*?:\s*([\d.]+%)", rules_text)
-        if agreement_match:
-            st.metric("Agreement with the real model (validation data)", agreement_match.group(1))
+        st.metric("Agreement with the real model (validation data)",
+                   f"{rules_data['agreement'] * 100:.1f}%")
+        st.divider()
 
-        st.code(rules_text, language=None)
+        high_risk_rules = [r for r in rules_data["rules"] if r["predicted_class"] == 1]
+        low_risk_rules = [r for r in rules_data["rules"] if r["predicted_class"] == 0]
+
+        col_high, col_low = st.columns(2)
+
+        with col_high:
+            st.markdown("#### :red[Rules Predicting High Risk]")
+            for rule in high_risk_rules:
+                conditions_text = " AND ".join(
+                    f"{c[0].replace('_', ' ').title()} {'\u2264' if c[1]=='<=' else '>'} {c[2]:.2f}"
+                    for c in rule["conditions"]
+                )
+                st.markdown(
+                    f"""<div style="background-color:#FCE8E6;border-left:4px solid #C0392B;
+                    padding:10px;border-radius:4px;margin-bottom:10px;font-size:13px;">
+                    {conditions_text}<br>
+                    <span style="color:#888;font-size:11px;">
+                    {rule['confidence']*100:.0f}% confidence \u2022 {rule['sample_count']} training applicants</span>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+
+        with col_low:
+            st.markdown("#### :green[Rules Predicting Low Risk]")
+            for rule in low_risk_rules:
+                conditions_text = " AND ".join(
+                    f"{c[0].replace('_', ' ').title()} {'\u2264' if c[1]=='<=' else '>'} {c[2]:.2f}"
+                    for c in rule["conditions"]
+                )
+                st.markdown(
+                    f"""<div style="background-color:#E8F5E0;border-left:4px solid #4A9130;
+                    padding:10px;border-radius:4px;margin-bottom:10px;font-size:13px;">
+                    {conditions_text}<br>
+                    <span style="color:#888;font-size:11px;">
+                    {rule['confidence']*100:.0f}% confidence \u2022 {rule['sample_count']} training applicants</span>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+
+        with st.expander("View raw decision tree (technical)"):
+            rules_path = os.path.join(PROJECT_ROOT, "outputs", "business_rules.txt")
+            if os.path.exists(rules_path):
+                with open(rules_path) as f:
+                    st.code(f.read(), language=None)
     else:
         st.info("Rules not found. Run `python src/ml/business_rules.py` first.")
 
 # --- Tab 4: Chat ---
 with tab_chat:
     st.header("Ask Your Data a Question")
+    st.caption("Built for: anyone on the team who wants a quick answer without writing SQL")
     st.write("Ask a question in plain English about the applicant dataset.")
 
     example_questions = [

@@ -97,6 +97,51 @@ def get_readable_rules(surrogate, feature_names) -> str:
         readable_rules = readable_rules.replace(raw_name, label)
 
     return readable_rules
+def get_structured_rules(surrogate, feature_names):
+    """Walks the trained tree directly and returns each decision path
+    as a structured rule (conditions + predicted class + confidence),
+    rather than printed tree text. This is what powers a readable
+    card-based display, instead of asking anyone to read raw ASCII
+    tree output."""
+    tree = surrogate.tree_
+    paths = []
+
+    def walk(node, conditions):
+        is_leaf = tree.children_left[node] == tree.children_right[node]
+        if is_leaf:
+            values = tree.value[node][0]
+            total = int(tree.n_node_samples[node])
+            class_idx = int(values.argmax())
+            predicted_class = int(surrogate.classes_[class_idx])
+            confidence = float(values[class_idx] / total) if total > 0 else 0.0
+            paths.append({
+                "conditions": list(conditions),
+                "predicted_class": predicted_class,
+                "confidence": round(confidence, 3),
+                "sample_count": total,
+            })
+            return
+        feature = feature_names[tree.feature[node]]
+        threshold = tree.threshold[node]
+        walk(tree.children_left[node], conditions + [(feature, "<=", threshold)])
+        walk(tree.children_right[node], conditions + [(feature, ">", threshold)])
+
+    walk(0, [])
+    return paths
+
+
+def format_rule_as_sentence(rule: dict) -> str:
+    """Turns one structured rule into a plain-English sentence, using
+    the same readable feature labels as explain.py."""
+    parts = []
+    for feature, operator, threshold in rule["conditions"]:
+        label = humanize_feature_name(feature)
+        direction = "at most" if operator == "<=" else "above"
+        parts.append(f"{label} is {direction} {threshold:.2f}")
+
+    condition_text = " AND ".join(parts)
+    risk_label = "HIGH RISK" if rule["predicted_class"] == 1 else "LOW RISK"
+    return f"IF {condition_text} \u2192 {risk_label}"
 
 
 def measure_surrogate_agreement(surrogate, X_val, model, feature_names) -> float:
@@ -133,6 +178,8 @@ def main():
     agreement = measure_surrogate_agreement(surrogate, X_val, model, feature_names)
 
     rules_text = get_readable_rules(surrogate, feature_names)
+    structured_rules = get_structured_rules(surrogate, feature_names)
+    rule_sentences = [format_rule_as_sentence(r) for r in structured_rules]
 
     print("=" * 60)
     print("BUSINESS RULES (simplified decision tree, max depth 3)")
@@ -154,6 +201,16 @@ def main():
         f.write(f"\nAgreement with the real model on validation data: "
                 f"{agreement * 100:.1f}%\n")
     print(f"\nSaved to {output_path}")
+
+    import json
+    structured_path = os.path.join(PROJECT_ROOT, "outputs", "business_rules_structured.json")
+    with open(structured_path, "w") as f:
+        json.dump({
+            "rules": structured_rules,
+            "sentences": rule_sentences,
+            "agreement": agreement,
+        }, f, indent=2)
+    print(f"Structured rules saved to {structured_path}")
 
 
 if __name__ == "__main__":
