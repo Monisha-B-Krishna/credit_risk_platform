@@ -256,9 +256,24 @@ into SQL queries against the dataset, using Groq's free LLM API.
 
 ## 6. Business Rules
 
-Not yet built. Planned: simple, readable rules extracted from the
-model (e.g. "if external score is low AND debt ratio is high, flag as
-high risk") for a non-technical audience like a credit policy team.
+`src/ml/business_rules.py` trains a shallow decision tree (max depth
+3) to approximate the real LightGBM model's predictions - a
+"surrogate model" simple enough for a non-technical credit policy
+team to review and understand. It is not a replacement for the actual
+model, and is not as accurate; validation-set agreement with the real
+model's predictions is reported honestly (81.6%) rather than
+presenting the simplified rules as equivalent to the real model.
+
+Protected/sensitive attributes (gender, marital status) are excluded
+from the surrogate, same as in the SHAP explanations. Raw day-count
+columns (DAYS_BIRTH, DAYS_EMPLOYED) are also excluded in favor of
+their readable year-based versions already built during feature
+engineering.
+
+The resulting rules confirm what EDA and SHAP both found throughout
+this project - the two external credit scores (EXT_SOURCE_2/3)
+dominate the decision, consistent with them being the strongest
+correlated features found back in exploratory analysis.
 
 ## 7. User Interface
 
