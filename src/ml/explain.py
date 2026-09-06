@@ -103,6 +103,19 @@ def humanize_feature_name(feature: str) -> str:
         return FEATURE_LABELS[feature]
     return feature.replace("_", " ").title()
 
+_cached_explainer = None
+
+
+def _get_cached_explainer(model):
+    """Building a SHAP TreeExplainer walks the entire model's tree
+    structure - expensive to redo on every single explanation request.
+    Cached once and reused, same pattern as the model loading cache in
+    predict.py."""
+    global _cached_explainer
+    if _cached_explainer is None:
+        _cached_explainer = shap.TreeExplainer(model)
+    return _cached_explainer
+
 
 def explain_prediction(applicant_data: dict, top_n: int = TOP_N_FEATURES) -> dict:
     """Score an applicant and explain the prediction with SHAP.
@@ -126,9 +139,8 @@ def explain_prediction(applicant_data: dict, top_n: int = TOP_N_FEATURES) -> dic
     probability = model.predict_proba(X)[0, 1]
     risk_band = get_risk_band(probability)
 
-    explainer = shap.TreeExplainer(model)
+    explainer = _get_cached_explainer(model)
     shap_values = explainer.shap_values(X)
-
     # SHAP's output shape for binary classification has changed across
     # versions - sometimes a list of two arrays (one per class),
     # sometimes a single 3D array (samples, features, classes). Either

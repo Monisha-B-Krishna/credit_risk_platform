@@ -47,7 +47,19 @@ COUNT_COLUMNS = [
 ]
 
 
+_cached_model_bundle = None
+
+
 def load_model_and_features():
+    """Loads the model and its metadata once, then reuses the cached
+    result. Reloading a joblib model file from disk on every single
+    prediction is wasted work - this is the same caching pattern used
+    for the DuckDB connection in query_runner.py."""
+    global _cached_model_bundle
+
+    if _cached_model_bundle is not None:
+        return _cached_model_bundle
+
     model_path = os.path.join(MODEL_DIR, "credit_risk_model.joblib")
     features_path = os.path.join(MODEL_DIR, "feature_columns.json")
     categories_path = os.path.join(MODEL_DIR, "categorical_categories.json")
@@ -58,7 +70,8 @@ def load_model_and_features():
     with open(categories_path) as f:
         categorical_categories = json.load(f)
 
-    return model, feature_columns, categorical_categories
+    _cached_model_bundle = (model, feature_columns, categorical_categories)
+    return _cached_model_bundle
 
 
 def get_risk_band(probability: float) -> str:
