@@ -222,9 +222,32 @@ Filled with defaults: 74
 
 ## 4. Explainability
 
-Not yet built. Planned: SHAP will be used to explain individual
-predictions in plain language (e.g. "this applicant is high-risk
-mainly because of a low external credit score").
+`src/ml/explain.py` uses SHAP (TreeExplainer) to explain individual
+predictions - which features pushed the risk score up or down, and by
+how much, in plain language rather than raw SHAP numbers.
+
+Two deliberate exclusions from the displayed explanation:
+- Features the applicant didn't provide a real value for (LightGBM can
+  treat missingness as informative, but "this increased your risk
+  (value: unknown)" isn't a useful explanation for a human reader)
+- Protected/sensitive attributes (gender, marital status) - the model
+  may use them internally, but showing them as a "reason" for a credit
+  decision is a fair-lending concern regardless of what SHAP
+  calculated mathematically
+
+Demo run (`python src/ml/explain.py`), same sample applicant as above:
+
+```
+Risk Assessment: MEDIUM (12.93/100)
+
+Factors increasing risk:
+  - Price of goods being financed: 450000.0
+  - Car ownership: N
+
+Factors decreasing risk:
+  - External credit score 3: 0.6
+  - Education level: Higher education
+```
 
 ## 5. Talk-to-Data Chatbot
 
@@ -263,3 +286,9 @@ whole app runs with a single command.
   filled with defaults (e.g. no prior bureau/installment history yet).
   The output reports exactly how many fields were provided versus
   defaulted, so this is transparent rather than hidden.
+- Protected/sensitive attributes (gender, marital status) are excluded
+  from the displayed SHAP explanation and from the business rules
+  surrogate tree, though the underlying model may still use them
+  internally. A full fair-lending audit of which features the model
+  relies on is outside this assignment's scope, but worth flagging as
+  a real consideration for any production credit system.
