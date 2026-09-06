@@ -113,7 +113,14 @@ def get_structured_rules(surrogate, feature_names):
             total = int(tree.n_node_samples[node])
             class_idx = int(values.argmax())
             predicted_class = int(surrogate.classes_[class_idx])
-            confidence = float(values[class_idx] / total) if total > 0 else 0.0
+            # Confidence uses values.sum() as its own denominator (not
+            # `total`) since `values` may already be normalized
+            # proportions rather than raw counts - dividing by its own
+            # sum gives the correct fraction either way. `total`
+            # (tree.n_node_samples) is kept separate, purely for the
+            # sample_count field.
+            values_sum = float(values.sum())
+            confidence = float(values[class_idx] / values_sum) if values_sum > 0 else 0.0
             paths.append({
                 "conditions": list(conditions),
                 "predicted_class": predicted_class,
