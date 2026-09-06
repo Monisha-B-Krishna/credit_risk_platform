@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    container_name: credit_risk_platform
+    ports:
+      - "${APP_PORT:-8501}:8501"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
