@@ -1,0 +1,26 @@
+Business Rules (simplified decision tree, max depth 3)
+============================================================
+|--- External credit score 3 <= 0.44
+|   |--- External credit score 2 <= 0.49
+|   |   |--- External credit score 3 <= 0.33
+|   |   |   |--- class: 1
+|   |   |--- External credit score 3 >  0.33
+|   |   |   |--- class: 1
+|   |--- External credit score 2 >  0.49
+|   |   |--- External credit score 3 <= 0.27
+|   |   |   |--- class: 1
+|   |   |--- External credit score 3 >  0.27
+|   |   |   |--- class: 0
+|--- External credit score 3 >  0.44
+|   |--- External credit score 2 <= 0.40
+|   |   |--- Employment duration (years) <= 8.25
+|   |   |   |--- class: 0
+|   |   |--- Employment duration (years) >  8.25
+|   |   |   |--- class: 0
+|   |--- External credit score 2 >  0.40
+|   |   |--- External credit score 2 <= 0.55
+|   |   |   |--- class: 0
+|   |   |--- External credit score 2 >  0.55
+|   |   |   |--- class: 0
+
+Agreement with the real model on validation data: 81.6%
