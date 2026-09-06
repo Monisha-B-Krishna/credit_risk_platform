@@ -320,7 +320,21 @@ with tab_chat:
             with st.spinner("Thinking..."):
                 try:
                     from src.talk_to_data.nl_to_sql import ask
-                    result = ask(question)
+
+                    # Build conversation history (question/answer pairs)
+                    # from the display history, excluding the question
+                    # just asked, so follow-up questions like "what
+                    # about for males?" can be resolved using context.
+                    qa_history = []
+                    messages = st.session_state.chat_history[:-1]
+                    for i in range(0, len(messages) - 1, 2):
+                        if messages[i]["role"] == "user" and messages[i + 1]["role"] == "assistant":
+                            qa_history.append({
+                                "question": messages[i]["content"],
+                                "answer": messages[i + 1]["content"],
+                            })
+
+                    result = ask(question, conversation_history=qa_history)
                     answer = result["answer"]
                     if result.get("sql"):
                         with st.expander("View SQL used"):

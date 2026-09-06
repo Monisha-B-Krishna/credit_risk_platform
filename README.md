@@ -308,6 +308,18 @@ this project - the two external credit scores (EXT_SOURCE_2/3)
 dominate the decision, consistent with them being the strongest
 correlated features found back in exploratory analysis.
 
+Sample output (`outputs/business_rules.txt`):
+```
+|--- External credit score 3 <= 0.44
+|   |--- External credit score 2 <= 0.49
+|   |   |--- class: 1
+|--- External credit score 3 >  0.44
+|   |--- External credit score 2 >  0.40
+|   |   |--- class: 0
+
+Agreement with the real model on validation data: 81.6%
+```
+
 ## 7. User Interface
 
 `app.py` (Streamlit) brings every module together into one app, four tabs:

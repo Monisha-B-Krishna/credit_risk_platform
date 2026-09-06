@@ -3,9 +3,10 @@ returns a plain-language answer.
 
 Pipeline:
     question -> Groq LLM generates SQL (grounded by the real schema,
-    prompt_templates.py) -> SQL validated (query_runner.py) -> SQL
-    executed against DuckDB -> results summarized back into a readable
-    answer by a second Groq call.
+    prompt_templates.py, and recent conversation history for follow-up
+    questions) -> SQL validated (query_runner.py) -> SQL executed
+    against DuckDB -> results summarized back into a readable answer
+    by a second Groq call.
 
 Two separate LLM calls are used (one for SQL generation, one for the
 final answer) rather than one combined call, so each prompt stays
@@ -35,6 +36,7 @@ from src.talk_to_data.prompt_templates import (
 
 LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-oss-120b")
 MAX_RETRIES = 1  # one retry with the error fed back, if the first SQL attempt fails
+MAX_HISTORY_TURNS = 3  # how many recent exchanges are fed back for follow-up questions
 
 
 def get_groq_client() -> Groq:
@@ -57,17 +59,40 @@ def clean_sql_response(raw_response: str) -> str:
     return cleaned.strip()
 
 
-def generate_sql(client: Groq, question: str, error_context: str = None) -> str:
-    """Calls Groq to convert a question into SQL. If error_context is
-    given, it's included so the model can see what went wrong on a
-    previous attempt and correct itself."""
+def _format_history(conversation_history: list) -> str:
+    """Formats recent Q&A turns into a short context block for the
+    prompt. Limited to the last MAX_HISTORY_TURNS exchanges to keep
+    token usage bounded rather than growing unboundedly over a long
+    conversation."""
+    if not conversation_history:
+        return ""
+
+    recent = conversation_history[-MAX_HISTORY_TURNS:]
+    lines = []
+    for turn in recent:
+        lines.append(f"Previous question: {turn['question']}")
+        lines.append(f"Previous answer: {turn['answer']}")
+    return "\n".join(lines) + "\n\n"
+
+
+def generate_sql(client: Groq, question: str, conversation_history: list = None,
+                  error_context: str = None) -> str:
+    """Calls Groq to convert a question into SQL.
+
+    conversation_history (a list of {"question": ..., "answer": ...}
+    dicts, most recent last) is included so follow-up questions like
+    "what about for males?" can be resolved using the prior topic.
+    error_context, if given, lets the model see and correct a previous
+    failed attempt.
+    """
     system_prompt = build_sql_system_prompt()
 
-    user_message = question
+    history_block = _format_history(conversation_history)
+    user_message = f"{history_block}Current question: {question}" if history_block else question
+
     if error_context:
-        user_message = (
-            f"{question}\n\n"
-            f"Your previous SQL attempt failed with this error:\n{error_context}\n"
+        user_message += (
+            f"\n\nYour previous SQL attempt failed with this error:\n{error_context}\n"
             f"Please generate a corrected query."
         )
 
@@ -106,19 +131,25 @@ def generate_answer(client: Groq, question: str, sql: str, results_text: str) ->
     return response.choices[0].message.content.strip()
 
 
-def ask(question: str) -> dict:
+def ask(question: str, conversation_history: list = None) -> dict:
     """Main entry point: question in, answer out.
+
+    Parameters
+    ----------
+    question : str
+    conversation_history : list of {"question": str, "answer": str}, optional
+        Recent prior exchanges in this conversation, most recent last.
+        Used to resolve follow-up questions - not persisted anywhere,
+        the caller (e.g. the Streamlit UI) is responsible for keeping
+        this across turns.
 
     Returns
     -------
     dict with keys: question, sql, results (as a string), answer, error
-    error is None on success, or a message if the question couldn't be
-    answered (e.g. the LLM returned NO_VALID_QUERY, or SQL validation
-    failed on every retry).
     """
     client = get_groq_client()
 
-    sql = generate_sql(client, question)
+    sql = generate_sql(client, question, conversation_history=conversation_history)
 
     if sql.strip().upper() == "NO_VALID_QUERY":
         return {
@@ -138,7 +169,8 @@ def ask(question: str) -> dict:
         except SQLSafetyError as e:
             last_error = str(e)
             if attempt < MAX_RETRIES:
-                sql = generate_sql(client, question, error_context=last_error)
+                sql = generate_sql(client, question, conversation_history=conversation_history,
+                                    error_context=last_error)
             else:
                 return {
                     "question": question,
@@ -161,9 +193,6 @@ def ask(question: str) -> dict:
     }
 
 
-# 5 example questions demonstrating different query patterns -
-# aggregation, filtering, grouping, joins, and a question the schema
-# genuinely cannot answer (to demonstrate NO_VALID_QUERY handling).
 DEMO_QUESTIONS = [
     "What is the average income of applicants who defaulted versus those who didn't?",
     "How many applicants have more than 2 previous applications that were refused?",
@@ -192,28 +221,31 @@ def run_demo():
 
 
 def run_interactive():
-    """Lets you type your own questions and get real answers, one at
-    a time, until you type 'exit' or 'quit'."""
+    """Lets you type your own questions and get real answers, with
+    conversation memory across turns (e.g. 'what about for males?'
+    resolves using the previous question's topic). Type 'exit' to quit."""
     print("Talk to your credit risk data. Type 'exit' to quit.\n")
+    history = []
     while True:
         question = input("Ask a question: ").strip()
         if question.lower() in ("exit", "quit", ""):
             print("Goodbye.")
             break
 
-        result = ask(question)
+        result = ask(question, conversation_history=history)
 
         if result["error"] and result["error"] != "NO_VALID_QUERY":
             print(f"Error: {result['error']}\n")
         else:
             print(f"SQL: {result['sql']}")
             print(f"Answer: {result['answer']}\n")
+            history.append({"question": question, "answer": result["answer"]})
 
 
 if __name__ == "__main__":
-    import sys
+    import sys as _sys
 
-    if "--demo" in sys.argv:
+    if "--demo" in _sys.argv:
         run_demo()
     else:
         run_interactive()

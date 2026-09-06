@@ -49,6 +49,11 @@ RULES:
 4. Always include a LIMIT clause (20 or fewer) unless the query is an aggregate that returns a single row (e.g. COUNT, AVG).
 5. Use table aliases and explicit JOIN conditions when combining tables (e.g. applications JOIN bureau ON applications.SK_ID_CURR = bureau.SK_ID_CURR).
 6. If the question cannot be answered using the schema above, respond with exactly: NO_VALID_QUERY
+7. If earlier conversation turns are provided, use them to resolve
+   follow-up questions (e.g. "what about for males?" or "and by
+   education level?" refers back to the previous question's topic).
+   Write a complete, standalone SQL query each time - do not assume
+   the previous query's result is still available.
 
 Write the SQL query for the user's question below.
 """
