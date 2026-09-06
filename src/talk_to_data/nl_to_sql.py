@@ -173,7 +173,9 @@ DEMO_QUESTIONS = [
 ]
 
 
-if __name__ == "__main__":
+def run_demo():
+    """Runs the 5 built-in example questions - demonstrates the
+    required query patterns without needing manual input."""
     for question in DEMO_QUESTIONS:
         print("=" * 70)
         print(f"Q: {question}")
@@ -187,3 +189,31 @@ if __name__ == "__main__":
             print(f"SQL: {result['sql']}")
             print(f"\nAnswer: {result['answer']}")
         print()
+
+
+def run_interactive():
+    """Lets you type your own questions and get real answers, one at
+    a time, until you type 'exit' or 'quit'."""
+    print("Talk to your credit risk data. Type 'exit' to quit.\n")
+    while True:
+        question = input("Ask a question: ").strip()
+        if question.lower() in ("exit", "quit", ""):
+            print("Goodbye.")
+            break
+
+        result = ask(question)
+
+        if result["error"] and result["error"] != "NO_VALID_QUERY":
+            print(f"Error: {result['error']}\n")
+        else:
+            print(f"SQL: {result['sql']}")
+            print(f"Answer: {result['answer']}\n")
+
+
+if __name__ == "__main__":
+    import sys
+
+    if "--demo" in sys.argv:
+        run_demo()
+    else:
+        run_interactive()
