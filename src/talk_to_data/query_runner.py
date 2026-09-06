@@ -80,12 +80,20 @@ class SQLSafetyError(Exception):
     pass
 
 
+_cached_connection = None
+
+
 def get_connection() -> duckdb.DuckDBPyConnection:
-    """Creates an in-memory DuckDB connection with all chatbot tables
-    loaded. A fresh connection is created per call - this is a small
-    dataset subset relative to the full pipeline, so reloading is fast
-    enough not to need connection pooling for this assignment's scope.
+    """Creates (once) and reuses an in-memory DuckDB connection with all
+    chatbot tables loaded. Cached at module level rather than reloaded
+    per call - reloading ~13.6 million installment rows on every single
+    question would make the chatbot noticeably slow in real use.
     """
+    global _cached_connection
+
+    if _cached_connection is not None:
+        return _cached_connection
+
     con = duckdb.connect(database=":memory:")
 
     for table_name, filename in TABLE_FILES.items():
@@ -98,7 +106,8 @@ def get_connection() -> duckdb.DuckDBPyConnection:
             SELECT * FROM read_csv_auto('{file_path}')
         """)
 
-    return con
+    _cached_connection = con
+    return _cached_connection
 
 
 def validate_sql(sql: str) -> None:
@@ -155,8 +164,6 @@ def run_query(sql: str, max_rows: int = 20) -> pd.DataFrame:
         result = con.execute(sql).fetchdf()
     except duckdb.Error as e:
         raise SQLSafetyError(f"Query failed to execute: {e}")
-    finally:
-        con.close()
 
     if len(result) > max_rows:
         result = result.head(max_rows)
@@ -164,11 +171,19 @@ def run_query(sql: str, max_rows: int = 20) -> pd.DataFrame:
     return result
 
 
+_cached_schema_summary = None
+
+
 def get_schema_summary() -> str:
     """Returns a compact text description of every table's columns and
     a couple of sample rows - used to ground the LLM's SQL generation
-    (see prompt_templates.py). Kept intentionally brief to control
-    token usage rather than dumping full column lists with types."""
+    (see prompt_templates.py). Cached at module level since the schema
+    doesn't change during a single run."""
+    global _cached_schema_summary
+
+    if _cached_schema_summary is not None:
+        return _cached_schema_summary
+
     con = get_connection()
     lines = []
 
@@ -190,8 +205,8 @@ def get_schema_summary() -> str:
         lines.append(f"Sample rows:\n{sample.to_string(index=False)}")
         lines.append("")
 
-    con.close()
-    return "\n".join(lines)
+    _cached_schema_summary = "\n".join(lines)
+    return _cached_schema_summary
 
 
 if __name__ == "__main__":
